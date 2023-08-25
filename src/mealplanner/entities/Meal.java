@@ -7,14 +7,18 @@ import java.util.stream.Collectors;
 
 public class Meal {
 
+    private int id;
     private String title;
     private MealType mealType;
     private List<Ingredient> ingredientList;
+    public static int currId = 0;
 
-    public Meal(MealType mealType, String title, List<Ingredient> ingredientList) {
+    public Meal(int id, MealType mealType, String title, List<Ingredient> ingredientList) {
+        this.id = id;
         this.mealType = mealType;
         this.title = title;
         this.ingredientList = ingredientList;
+        currId++;
     }
 
     public MealType getMealType() {
@@ -23,6 +27,10 @@ public class Meal {
 
     public String getTitle() {
         return title;
+    }
+
+    public int getId() {
+        return id;
     }
 
     public List<Ingredient> getIngredientList() {
@@ -36,9 +44,8 @@ public class Meal {
                 Name: %s
                 Ingredients:
                 %s
-                The meal has been added!
                 """, this.mealType.getTitle(), this.title,
-                String.join("\n ",
+                String.join("\n",
                         ingredientList
                                 .stream()
                                 .map(ingredient -> ingredient.getTitle())

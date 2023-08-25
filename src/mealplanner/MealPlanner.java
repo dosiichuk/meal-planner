@@ -1,5 +1,7 @@
 package mealplanner;
 
+import mealplanner.dictionaries.CommandType;
+import mealplanner.dictionaries.LoggerPrompts;
 import mealplanner.service.MealPlannerService;
 
 public class MealPlanner implements Runnable {
@@ -13,6 +15,26 @@ public class MealPlanner implements Runnable {
 
     @Override
     public void run() {
-        mealPlannerService.addMeal();
+        while(true) {
+            String toDo = "";
+            while (!CommandType.isValidCommandType(toDo)) {
+                logger.generatePrompt(LoggerPrompts.TO_DO_COMMAND);
+                toDo = logger.takeUserInput();
+            }
+            CommandType commandType = CommandType.getCommandTypeByTitle(toDo);
+            switch (commandType) {
+                case ADD:
+                    mealPlannerService.addMeal();
+                    break;
+                case SHOW:
+                    mealPlannerService.showMeals();
+                    break;
+                case EXIT:
+                    logger.log(LoggerPrompts.BYE.getPrompt(), false);
+                    System.exit(0);
+            }
+
+        }
+
     }
 }

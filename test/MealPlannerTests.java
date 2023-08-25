@@ -1,114 +1,372 @@
 import org.hyperskill.hstest.dynamic.DynamicTest;
+import org.hyperskill.hstest.exception.outcomes.WrongAnswer;
 import org.hyperskill.hstest.stage.StageTest;
 import org.hyperskill.hstest.testcase.CheckResult;
 import org.hyperskill.hstest.testing.TestedProgram;
 
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public class MealPlannerTests extends StageTest {
 
-  @DynamicTest
-  CheckResult normalExe1Test() {
+  static final String DB_URL = "jdbc:postgresql:meals_db";
+  static final String USER = "postgres";
+  static final String PASS = "1111";
+
+  public class Column {
+    private String first;
+    private String second;
+
+    public Column(String first, String second) {
+      this.first = first;
+      this.second = second;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      Column column = (Column) o;
+      return Objects.equals(first, column.first) && Objects.equals(second, column.second);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(first, second);
+    }
+  }
+
+  class dbTable {
+    String name;
+    List<Column> columnNameType;
+
+    public dbTable(String name, List<Column> columnNameType) {
+      this.name = name;
+      this.columnNameType = columnNameType;
+    }
+  }
+
+  void checkTableSchema(List<dbTable> tables) {
+    try {
+      Connection connection = DriverManager.getConnection(DB_URL, USER, PASS);
+      DatabaseMetaData meta = connection.getMetaData();
+      for (dbTable table : tables) {
+        ResultSet tableMeta = meta.getTables(null, null, table.name, null);
+        if (!tableMeta.next() || !table.name.equalsIgnoreCase(tableMeta.getString("TABLE_NAME"))) {
+          throw new WrongAnswer("The table \"" + table.name + "\" doesn't exist.");
+        }
+        ResultSet columns = meta.getColumns(null, null, table.name, null);
+        List<Column> columnsData = new ArrayList<>();
+        while (columns.next()) {
+          Column column = new Column(
+                  columns.getString("COLUMN_NAME").toLowerCase(),
+                  columns.getString("TYPE_NAME").toLowerCase());
+          columnsData.add(column);
+        }
+        for (Column c : table.columnNameType) {
+          if (!columnsData.contains(c)) {
+            for (Column c2 : columnsData) {
+              if (c.first.equals(c2.first)) {
+                throw new WrongAnswer("The column \"" + c.first + "\" of the table \"" + table.name + "\" is of the " +
+                        "wrong type.");
+              }
+            }
+            throw new WrongAnswer("The column \"" + c.first + "\" of the table \"" + table.name + "\" doesn't exist.");
+          }
+        }
+      }
+      connection.close();
+    } catch (Exception e) {
+      throw new WrongAnswer("An exception was thrown, while trying to check the database schema - " + e.getMessage());
+    }
+  }
+
+  void checkConnection() {
+    try {
+      Class.forName("org.postgresql.Driver");
+    } catch (ClassNotFoundException e) {
+      throw new WrongAnswer("An exception was thrown, while trying to connect to database. PostgreSQL JDBC Driver is " +
+              "not found.");
+    }
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (SQLException e) {
+      throw new WrongAnswer("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
+
+    if (connection == null) {
+      throw new WrongAnswer("Failed to make connection to database");
+    }
+  }
+
+  @DynamicTest(order = 1)
+  public CheckResult normalExe6Test() {
+    checkConnection();
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
+    try {
+      Statement statement = connection.createStatement();
+      statement.executeUpdate("DROP TABLE if exists plan");
+      statement.executeUpdate("DROP TABLE if exists ingredients");
+      statement.executeUpdate("DROP TABLE if exists meals");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to drop tables - "+e);
+    }
+
     CheckOutput co = new CheckOutput();
-    if (!co.start("Which meal do you want to add (breakfast, lunch, dinner)?") )
-      return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)?\"");
+    if (!co.start("What would you like to do (add, show, exit)?"))
+      return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+    ArrayList<dbTable> tables = new ArrayList<>(Arrays.asList(
+            new dbTable("ingredients", new ArrayList<>(
+                    Arrays.asList(
+                            new Column("ingredient", "varchar"),
+                            new Column("ingredient_id", "int4"),
+                            new Column("meal_id", "int4")
+                    )
+            )),
+            new dbTable("meals", new ArrayList<>(
+                    Arrays.asList(
+                            new Column("category", "varchar"),
+                            new Column("meal", "varchar"),
+                            new Column("meal_id", "int4")
+                    )
+            ))
+    ));
+    checkTableSchema(tables);
 
-    if (!co.input("lunch", "Input the meal's name:"))
-      return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
-
-    if (!co.input("sushi", "Input the ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
-
-    if (!co.input("salmon, rice, avocado", "Category: lunch"))
-      return CheckResult.wrong("Your output should contain \"Category: lunch\"");
-
-    if (!co.inputNext("Name: sushi"))
-      return CheckResult.wrong("Your output should contain \"Name: sushi\"");
-
-    if (!co.inputNext("Ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Ingredients:\"");
-
-    if (!co.inputNext("salmon", "rice", "avocado"))
-      return CheckResult.wrong("Your output should contain the ingredients list");
-
-    if (!co.inputNext("The meal has been added!"))
-      return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
-
-    if (!co.programIsFinished() )
+    if (!co.input("exit", "Bye!"))
+      return CheckResult.wrong("Your output should contain \"Bye!\"");
+    if (!co.programIsFinished())
       return CheckResult.wrong("The application didn't exit.");
+    return CheckResult.correct();
+  }
+
+  @DynamicTest(order = 2)
+  CheckResult normalExe7Test() {
+    checkConnection();
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
+    try {
+      Statement statement = connection.createStatement();
+      statement.executeUpdate("DROP TABLE if exists plan");
+      statement.executeUpdate("DROP TABLE if exists ingredients");
+      statement.executeUpdate("DROP TABLE if exists meals");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to drop tables - "+e);
+    }
+
+    try {
+      CheckOutput co = new CheckOutput();
+      if (!co.start("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("add", "Which meal do you want to add (breakfast, lunch, dinner)?"))
+        return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)" +
+                "?\"");
+
+      if (!co.input("lunch", "Input the meal's name:"))
+        return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
+
+      if (!co.input("sushi", "Input the ingredients:"))
+        return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
+
+      if (!co.input("salmon, rice, avocado", "The meal has been added!"))
+        return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
+
+      if (!co.inputNext("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("show",
+              "Category: lunch", "Name: sushi", "Ingredients:", "salmon", "rice", "avocado"))
+        return CheckResult.wrong("Wrong \"show\" output for a saved meal.");
+
+      if (!co.input("exit", "Bye!"))
+        return CheckResult.wrong("Your output should contain \"Bye!\"");
+
+      if (!co.programIsFinished())
+        return CheckResult.wrong("The application didn't exit.");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown while testing - " + e);
+    }
 
     return CheckResult.correct();
   }
 
-  @DynamicTest
-  CheckResult normalExe2Test() {
-    CheckOutput co = new CheckOutput();
-    if (!co.start("Which meal do you want to add (breakfast, lunch, dinner)?") )
-      return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)?\"");
+  @DynamicTest(order = 3)
+  CheckResult normalExe8Test() {
+    checkConnection();
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
 
-    if (!co.input("dinner", "Input the meal's name:"))
-      return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
+    try {
+      CheckOutput co = new CheckOutput();
+      if (!co.start("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
 
-    if (!co.input("salad", "Input the ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
+      if (!co.input(
+              "show", "Category: lunch", "Name: sushi", "Ingredients:",
+              "salmon", "rice", "avocado"))
+        return CheckResult.wrong("Wrong \"show\" output for a saved meal.");
 
-    if (!co.input("lettuce,tomato,onion,cheese,olives", "Category: dinner"))
-      return CheckResult.wrong("Your output should contain \"Category: dinner\"");
+      if (!co.input("exit", "Bye!"))
+        return CheckResult.wrong("Your output should contain \"Bye!\"");
 
-    if (!co.inputNext("Name: salad"))
-      return CheckResult.wrong("Your output should contain \"Name: salad\"");
-
-    if (!co.inputNext("Ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Ingredients:\"");
-
-    if (!co.inputNext("lettuce", "tomato", "onion", "cheese", "olives"))
-      return CheckResult.wrong("Your output should contain the ingredients list");
-
-    if (!co.inputNext("The meal has been added!"))
-      return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
-
-    if (!co.programIsFinished() )
-      return CheckResult.wrong("The application didn't exit.");
-
-    return CheckResult.correct();
-  }
-
-  @DynamicTest
-  CheckResult normalExe3Test() {
-    CheckOutput co = new CheckOutput();
-    if (!co.start("Which meal do you want to add (breakfast, lunch, dinner)?") )
-      return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)?\"");
-
-    if (!co.input("breakfast", "Input the meal's name:"))
-      return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
-
-    if (!co.input("oatmeal", "Input the ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
-
-    if (!co.input("oats, milk, banana, peanut butter", "Category: breakfast"))
-      return CheckResult.wrong("Your output should contain \"Category: breakfast\"");
-
-    if (!co.inputNext("Name: oatmeal"))
-      return CheckResult.wrong("Your output should contain \"Name: oatmeal\"");
-
-    if (!co.inputNext("Ingredients:"))
-      return CheckResult.wrong("Your output should contain \"Ingredients:\"");
-
-    if (!co.inputNext("oats", "milk", "banana", "peanut butter"))
-      return CheckResult.wrong("Your output should contain the ingredients list");
-
-    if (!co.inputNext("The meal has been added!"))
-      return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
-
-    if (!co.programIsFinished() )
-      return CheckResult.wrong("The application didn't exit.");
+      if (!co.programIsFinished())
+        return CheckResult.wrong("The application didn't exit.");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown while testing - " + e);
+    }
 
     return CheckResult.correct();
   }
 
+  @DynamicTest(order = 4)
+  CheckResult normalExeNew01Test() {
+    checkConnection();
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
+    try {
+      Statement statement = connection.createStatement();
+      statement.executeUpdate("DROP TABLE if exists plan");
+      statement.executeUpdate("DROP TABLE if exists ingredients");
+      statement.executeUpdate("DROP TABLE if exists meals");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to drop tables - "+e);
+    }
+
+    try {
+      CheckOutput co = new CheckOutput();
+      if (!co.start("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("add", "Which meal do you want to add (breakfast, lunch, dinner)?"))
+        return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)" +
+                "?\"");
+
+      if (!co.input("lunch", "Input the meal's name:"))
+        return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
+
+      if (!co.input("sushi", "Input the ingredients:"))
+        return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
+
+      if (!co.input("salmon, rice, avocado", "The meal has been added!"))
+        return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
+
+      if (!co.inputNext("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("add", "Which meal do you want to add (breakfast, lunch, dinner)?"))
+        return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)" +
+                "?\"");
+
+      if (!co.input("breakfast", "Input the meal's name:"))
+        return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
+
+      if (!co.input("english", "Input the ingredients:"))
+        return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
+
+      if (!co.input("sausages, eggs", "The meal has been added!"))
+        return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
+
+      if (!co.inputNext("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("add", "Which meal do you want to add (breakfast, lunch, dinner)?"))
+        return CheckResult.wrong("Your program should ask the user about meal category: \"(breakfast, lunch, dinner)" +
+                "?\"");
+
+      if (!co.input("dinner", "Input the meal's name:"))
+        return CheckResult.wrong("Your output should contain \"Input the meal's name:\"");
+
+      if (!co.input("meatballs", "Input the ingredients:"))
+        return CheckResult.wrong("Your output should contain \"Input the ingredients:\"");
+
+      if (!co.input("meat, bread, salt, pepper, egg", "The meal has been added!"))
+        return CheckResult.wrong("Your output should contain \"The meal has been added!\"");
+
+      if (!co.inputNext("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input(
+              "show", "Category: lunch", "Name: sushi", "Ingredients:",
+              "salmon", "rice", "avocado"))
+        return CheckResult.wrong("Wrong \"show\" output for the lunch meal.");
+
+      if (!co.inputNext("Category: breakfast", "Name: english", "Ingredients:",
+              "sausages", "eggs"))
+        return CheckResult.wrong("Wrong \"show\" output for the breakfast meal.");
+
+      if (!co.inputNext("Category: dinner", "Name: meatballs", "Ingredients:",
+              "meat", "bread", "salt", "pepper", "egg"))
+        return CheckResult.wrong("Wrong \"show\" output for the dinner meal.");
+
+      if (!co.inputNext("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input("exit", "Bye!"))
+        return CheckResult.wrong("Your output should contain \"Bye!\"");
+
+      if (!co.programIsFinished())
+        return CheckResult.wrong("The application didn't exit.");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown while testing - " + e);
+    }
+
+    return CheckResult.correct();
+  }
+
+  @DynamicTest(order = 5)
+  CheckResult normalExeNew02Test() {
+    checkConnection();
+    Connection connection = null;
+    try {
+      connection = DriverManager.getConnection(DB_URL, USER, PASS);
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown, while trying to connect to database. Connection Failed");
+    }
+    try {
+      CheckOutput co = new CheckOutput();
+      if (!co.start("What would you like to do (add, show, exit)?"))
+        return CheckResult.wrong("Your program should ask the user about the required action: \"(add, show, exit)?\"");
+
+      if (!co.input(
+              "show", "Category: lunch", "Name: sushi", "Ingredients:",
+              "salmon", "rice", "avocado"))
+        return CheckResult.wrong("Wrong \"show\" output for a saved meal.");
+
+      if (!co.input("exit", "Bye!"))
+        return CheckResult.wrong("Your output should contain \"Bye!\"");
+
+      if (!co.programIsFinished())
+        return CheckResult.wrong("The application didn't exit.");
+    } catch (Exception e) {
+      return CheckResult.wrong("An exception was thrown while testing - " + e);
+    }
+
+    return CheckResult.correct();
+  }
 }
+
 
 class CheckOutput {
   private TestedProgram main = new TestedProgram();
