@@ -93,12 +93,24 @@ public class MealPlannerService {
     }
 
     public void showMeals() {
-        mealList = dbMealDao.findAll();
-        if (mealList.size() == 0) {
-            logger.log(LoggerPrompts.NOTHING_TO_SHOW.getPrompt(), false);
-        } else {
-            logger.log("", false);
-            mealList.forEach(meal -> logger.log(meal.toString(), false));
+        logger.log(LoggerPrompts.SHOW_MEALS_QUERY.getPrompt(), false);
+        while (true) {
+            String userInput = logger.takeUserInput();
+            MealType mealType = MealType.getMealTypeByTitle(userInput);
+            if (mealType == null) {
+                logger.log(LoggerPrompts.INVALID_MEAL_TYPE.getPrompt(), false);
+            } else {
+                List<Meal> mealList = dbMealDao.findByMealType(mealType);
+                if (mealList.size() == 0) {
+                    logger.log(LoggerPrompts.NOTHING_TO_SHOW.getPrompt(), false);
+                    break;
+                } else {
+                    logger.log("", false);
+                    logger.log("Category: %s\n", true, mealType.getTitle());
+                    mealList.forEach(meal -> logger.log(meal.toString(), false));
+                    break;
+                }
+            }
         }
     }
 

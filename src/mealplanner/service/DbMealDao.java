@@ -19,6 +19,7 @@ public class DbMealDao implements MealDao {
                                                                                "meal_id INTEGER PRIMARY KEY)";
     private final String INSERT = "INSERT INTO meals (category, meal, meal_id) VALUES (?, ?, ?)";
     private final String FIND_ALL = "SELECT * FROM meals";
+    private final String FIND_BY_MEAL_TYPE = "SELECT * FROM meals WHERE category = ?";
     private final String FIND_ONE = "SELECT * FROM meals WHERE category = ? and meal = ?";
 
     public DbMealDao() {
@@ -82,6 +83,27 @@ public class DbMealDao implements MealDao {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public List<Meal> findByMealType(MealType mealType) {
+        List<Meal> mealList = new ArrayList<>();
+        try (Connection con = DriverManager.getConnection(DB_URL, USER, PASS);
+             PreparedStatement preparedStatement = con.prepareStatement(FIND_BY_MEAL_TYPE);
+        ) {
+            preparedStatement.setString(1, mealType.getTitle());
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                String category = resultSet.getString("category");
+                String meal = resultSet.getString("meal");
+                int id = resultSet.getInt("meal_id");
+                List<Ingredient> ingredientList = dbIngredientDao.findByMealId(id);
+                mealList.add(new Meal(id, MealType.getMealTypeByTitle(category), meal, ingredientList));
+            }
+            return mealList;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return mealList;
     }
 
     public void update(Meal meal) {

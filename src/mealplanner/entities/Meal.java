@@ -40,11 +40,10 @@ public class Meal {
     @Override
     public String toString() {
         return String.format("""
-                Category: %s
                 Name: %s
                 Ingredients:
                 %s
-                """, this.mealType.getTitle(), this.title,
+                """, this.title,
                 String.join("\n",
                         ingredientList
                                 .stream()
