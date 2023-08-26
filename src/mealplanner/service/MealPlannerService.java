@@ -4,10 +4,16 @@ import mealplanner.Logger;
 import mealplanner.Validator;
 import mealplanner.dictionaries.LoggerPrompts;
 import mealplanner.dictionaries.MealType;
+import mealplanner.dictionaries.Weekday;
 import mealplanner.entities.Ingredient;
 import mealplanner.entities.Meal;
+import mealplanner.service.dao.DbIngredientDao;
+import mealplanner.service.dao.DbMealDao;
+import mealplanner.service.dao.DbPlanDao;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,6 +23,7 @@ public class MealPlannerService {
     private static List<Ingredient> ingredientList;
     private DbMealDao dbMealDao;
     private final DbIngredientDao dbIngredientDao;
+    private final DbPlanDao dbPlanDao;
 
 
     public MealPlannerService(Logger logger) {
@@ -25,6 +32,8 @@ public class MealPlannerService {
         this.dbMealDao.initMealsTable();
         this.dbIngredientDao = new DbIngredientDao();
         this.dbIngredientDao.initIngredientsTable();
+        this.dbPlanDao = new DbPlanDao();
+        this.dbPlanDao.initPlanTable();
         this.mealList = dbMealDao.findAll();
         Meal.currId = mealList.size() + 1;
         this.ingredientList = dbIngredientDao.findAll();
@@ -111,6 +120,68 @@ public class MealPlannerService {
                     break;
                 }
             }
+        }
+    }
+
+    public void planMeals() {
+        for (Weekday weekday: Weekday.values()) {
+            planMealsForWeekday(weekday);
+            logger.log("Yeah! We planned the meals for %s.\n", true, weekday.getDayName());
+        }
+        showWeeklyPlan();
+    }
+
+    public void planMealsForWeekday(Weekday weekday) {
+        logger.log(weekday.getDayName(), false);
+        for (MealType mealType: MealType.values()) {
+            selectMeal(mealType, weekday);
+        }
+    }
+
+    public void selectMeal(MealType mealType, Weekday weekday) {
+        List<Meal> mealList = dbMealDao.findByMealType(mealType);
+        Collections.sort(mealList, new Comparator<Meal>() {
+            @Override
+            public int compare(Meal o1, Meal o2) {
+                return o1.getTitle().compareTo(o2.getTitle());
+            }
+        });
+        mealList.stream().forEach(meal -> logger.log("%s", true, meal.getTitle()));
+        logger.log("Choose the %s for %s from the list above:", true, mealType.getTitle(), weekday.getDayName());
+        Meal selectedMeal;
+        while (true) {
+            String userInput = logger.takeUserInput();
+            Meal identifiedMeal = identifyMealByTitle(userInput, mealList);
+            if (identifiedMeal == null) {
+                logger.log("This meal doesn’t exist. Choose a meal from the list above.", false);
+            } else {
+                dbPlanDao.add(identifiedMeal.getTitle(), identifiedMeal.getMealType().getTitle(), weekday.getDayName(), identifiedMeal.getId());
+                break;
+            }
+        }
+
+    }
+
+    public Meal identifyMealByTitle(String mealTitle, List<Meal> mealList) {
+        for (Meal meal: mealList) {
+            if (meal.getTitle().equals(mealTitle)) {
+                return meal;
+            }
+        }
+        return null;
+    }
+
+    public void showWeeklyPlan() {
+        for (Weekday weekday: Weekday.values()) {
+            List<Meal> mealList = dbPlanDao.findByWeekday(weekday.getDayName());
+            logger.log("", false);
+            logger.log("%s", true, weekday.getDayName());
+            mealList.stream().forEach(meal ->
+                    logger.log("%s: %s",
+                            true,
+                            meal.getMealType().getTitle(),
+                            meal.getTitle()));
+            logger.log("", false);
         }
     }
 

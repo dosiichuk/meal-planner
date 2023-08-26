@@ -1,4 +1,4 @@
-package mealplanner.service;
+package mealplanner.service.dao;
 
 import mealplanner.entities.Ingredient;
 import mealplanner.interfaces.IngredientDao;
@@ -57,6 +57,7 @@ public class DbIngredientDao implements IngredientDao {
                 int meal_id = resultSet.getInt("meal_id");
                 ingredientList.add(new Ingredient(id, meal_id, ingredient));
             }
+            resultSet.close();
             return ingredientList;
         } catch (SQLException e) {
             e.printStackTrace();

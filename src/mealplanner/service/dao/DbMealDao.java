@@ -1,4 +1,4 @@
-package mealplanner.service;
+package mealplanner.service.dao;
 
 import mealplanner.dictionaries.MealType;
 import mealplanner.entities.Ingredient;

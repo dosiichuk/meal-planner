@@ -3,6 +3,7 @@ package mealplanner.dictionaries;
 public enum CommandType {
     ADD("add"),
     SHOW("show"),
+    PLAN("plan"),
     EXIT("exit");
 
     private String command;

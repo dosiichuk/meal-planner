@@ -29,6 +29,9 @@ public class MealPlanner implements Runnable {
                 case SHOW:
                     mealPlannerService.showMeals();
                     break;
+                case PLAN:
+                    mealPlannerService.planMeals();
+                    break;
                 case EXIT:
                     logger.log(LoggerPrompts.BYE.getPrompt(), false);
                     System.exit(0);
