@@ -1,7 +1,7 @@
 package mealplanner.dictionaries;
 
 public enum LoggerPrompts {
-    TO_DO_COMMAND("What would you like to do (add, show, plan, exit)?"),
+    TO_DO_COMMAND("What would you like to do (add, show, plan, save, exit)?"),
     ADD_MEAL_QUERY("Which meal do you want to add (breakfast, lunch, dinner)?"),
     SHOW_MEALS_QUERY("Which category do you want to print (breakfast, lunch, dinner)?"),
     GET_MEAL_NAME("Input the meal's name:"),

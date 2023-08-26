@@ -4,6 +4,7 @@ public enum CommandType {
     ADD("add"),
     SHOW("show"),
     PLAN("plan"),
+    SAVE("save"),
     EXIT("exit");
 
     private String command;

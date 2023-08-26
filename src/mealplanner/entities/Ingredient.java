@@ -1,5 +1,7 @@
 package mealplanner.entities;
 
+import java.util.Objects;
+
 public class Ingredient {
     private int id;
     private int mealId;
@@ -23,5 +25,18 @@ public class Ingredient {
 
     public int getMealId() {
         return mealId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Ingredient that = (Ingredient) o;
+        return getTitle().equals(that.getTitle());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getTitle());
     }
 }

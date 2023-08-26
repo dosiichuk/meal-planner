@@ -32,6 +32,9 @@ public class MealPlanner implements Runnable {
                 case PLAN:
                     mealPlannerService.planMeals();
                     break;
+                case SAVE:
+                    mealPlannerService.saveShoppingList();
+                    break;
                 case EXIT:
                     logger.log(LoggerPrompts.BYE.getPrompt(), false);
                     System.exit(0);

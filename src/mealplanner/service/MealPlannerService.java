@@ -11,11 +11,12 @@ import mealplanner.service.dao.DbIngredientDao;
 import mealplanner.service.dao.DbMealDao;
 import mealplanner.service.dao.DbPlanDao;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class MealPlannerService {
     private Logger logger;
@@ -185,4 +186,47 @@ public class MealPlannerService {
         }
     }
 
+    public void saveShoppingList() {
+        Map<Ingredient, Integer> ingredientMap = new HashMap();
+        List<Meal> mealList = dbPlanDao.findAll();
+        if(mealList.size() ==0) {
+            logger.log("Unable to save. Plan your meals first.", false);
+        } else {
+            mealList.stream().forEach(meal -> {
+                List<Ingredient> ingredients = dbIngredientDao.findByMealId(meal.getId());
+                ingredients.stream().forEach(ingredient -> {
+                    if (ingredientMap.get(ingredient) == null) {
+                        ingredientMap.put(ingredient, 1);
+                    } else {
+                        Integer currCount = ingredientMap.get(ingredient);
+                        ingredientMap.put(ingredient, currCount + 1);
+                    }
+                });
+            });
+            try {
+                saveListToFile(ingredientMap);
+            } catch (IOException e) {
+
+            }
+        }
+
+
+    }
+
+    public void saveListToFile(Map<Ingredient, Integer> ingredientMap) throws IOException {
+        logger.log("Input a filename:", false);
+        String userInput = logger.takeUserInput();
+        StringBuilder outputString = new StringBuilder();
+        for (Map.Entry<Ingredient, Integer> ingredientIntegerEntry: ingredientMap.entrySet()) {
+            if (ingredientIntegerEntry.getValue() == 1) {
+                outputString.append(ingredientIntegerEntry.getKey().getTitle() + "\n");
+            } else {
+                outputString.append(ingredientIntegerEntry.getKey().getTitle() + " x" +ingredientIntegerEntry.getValue() + "\n");
+            }
+        }
+        BufferedWriter writer = new BufferedWriter(new FileWriter(userInput));
+        writer.write(String.valueOf(outputString));
+        writer.close();
+        logger.log("Saved!", false);
+    }
 }
